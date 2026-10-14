@@ -7,12 +7,11 @@ const $ = (id) => document.getElementById(id);
 const source = $('source');
 const code = $('code');
 const listingBox = $('listing');
-const autoBox = $('auto');
 const exampleSelect = $('example');
 
 const panes = {
-  source: { textarea: source, diag: $('source-diag'), file: 'source.cafe', marks: new Map() },
-  code: { textarea: code, diag: $('code-diag'), file: 'code.txt', marks: new Map() },
+  source: { textarea: source, diag: $('source-diag'), file: 'source.cafe', errorLines: new Set() },
+  code: { textarea: code, diag: $('code-diag'), file: 'code.txt', errorLines: new Set() },
 };
 
 function runCompile() {
@@ -20,9 +19,8 @@ function runCompile() {
   try {
     const result = compile(text);
     code.value = listingBox.checked ? listing(text, result.lines) : result.text;
-    showDiagnostics(panes.source, text, result.warnings, null, `コンパイル成功 (${result.lines.length} 行)`);
-    clearDiagnostics(panes.code);
-    updateGutter(panes.code);
+    showDiagnostics(panes.source, text, result.warnings);
+    showDiagnostics(panes.code, '', []);
   } catch (e) {
     showDiagnostics(panes.source, text, [], e);
   }
@@ -34,52 +32,37 @@ function runDecompile() {
   try {
     const result = decompile(text);
     source.value = result.source;
-    showDiagnostics(panes.code, text, result.warnings, null, '逆コンパイル成功');
-    clearDiagnostics(panes.source);
-    updateGutter(panes.source);
+    showDiagnostics(panes.code, text, result.warnings);
+    showDiagnostics(panes.source, '', []);
   } catch (e) {
     showDiagnostics(panes.code, text, [], e);
   }
   save();
 }
 
-function showDiagnostics(pane, text, warnings, error, okMessage) {
-  clearDiagnostics(pane);
-  const items = [];
+function showDiagnostics(pane, text, warnings, error) {
+  const items = warnings.map((w) => ({ kind: 'warning', err: w }));
   if (error) {
-    const isCompileError = error instanceof CompileError;
-    const err = isCompileError ? error : { message: `内部エラー: ${error.message}` };
-    if (!isCompileError) console.error(error);
-    items.push({ kind: 'error', err });
+    if (!(error instanceof CompileError)) console.error(error);
+    const err = error instanceof CompileError ? error : { message: `内部エラー: ${error.message}` };
+    items.unshift({ kind: 'error', err });
   }
-  for (const w of warnings) items.push({ kind: 'warning', err: w });
 
-  for (const { kind, err } of items) {
-    const li = document.createElement('li');
-    li.className = kind;
-    li.textContent = formatDiagnostic(kind, err, text, pane.file);
-    if (err.pos) {
-      li.dataset.line = err.pos.line;
-      li.dataset.col = err.pos.col ?? 1;
-      li.title = 'クリックで該当行へ移動';
-      if (pane.marks.get(err.pos.line) !== 'err') pane.marks.set(err.pos.line, kind === 'error' ? 'err' : 'warn');
-    }
-    pane.diag.append(li);
-  }
-  if (!error && okMessage) {
-    const li = document.createElement('li');
-    li.className = 'ok';
-    li.textContent = warnings.length ? `${okMessage} / 警告 ${warnings.length} 件` : okMessage;
-    pane.diag.prepend(li);
-  }
+  pane.errorLines.clear();
+  pane.diag.replaceChildren(
+    ...items.map(({ kind, err }) => {
+      const li = document.createElement('li');
+      li.className = kind;
+      li.textContent = formatDiagnostic(kind, err, text, pane.file);
+      if (err.pos) {
+        li.dataset.line = err.pos.line;
+        li.dataset.col = err.pos.col ?? 1;
+        if (kind === 'error') pane.errorLines.add(err.pos.line);
+      }
+      return li;
+    }),
+  );
   updateGutter(pane);
-  const first = pane.diag.querySelector('li[data-line]');
-  if (error && first) jumpTo(pane.textarea, +first.dataset.line, +first.dataset.col);
-}
-
-function clearDiagnostics(pane) {
-  pane.diag.replaceChildren();
-  pane.marks.clear();
 }
 
 function jumpTo(textarea, line, col) {
@@ -87,9 +70,8 @@ function jumpTo(textarea, line, col) {
   let offset = 0;
   for (let i = 0; i < line - 1 && i < lines.length; i++) offset += lines[i].length + 1;
   const lineLen = lines[line - 1]?.length ?? 0;
-  const start = offset + Math.min(col - 1, lineLen);
   textarea.focus({ preventScroll: true });
-  textarea.setSelectionRange(start, offset + lineLen);
+  textarea.setSelectionRange(offset + Math.min(col - 1, lineLen), offset + lineLen);
   const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
   textarea.scrollTop = Math.max(0, (line - 3) * lineHeight);
 }
@@ -99,33 +81,23 @@ function updateGutter(pane) {
   const count = pane.textarea.value.split('\n').length;
   const frag = document.createDocumentFragment();
   for (let n = 1; n <= count; n++) {
-    const mark = pane.marks.get(n);
-    if (mark) {
+    if (pane.errorLines.has(n)) {
       const span = document.createElement('span');
-      span.className = mark;
+      span.className = 'err';
       span.textContent = n;
       frag.append(span, '\n');
     } else {
       frag.append(n + '\n');
     }
   }
-  // Extra line so the gutter can scroll as far as the textarea's horizontal scrollbar allows.
+  // Extra line so the gutter can scroll as far as the textarea with a horizontal scrollbar.
   frag.append('\n');
   gutter.replaceChildren(frag);
   gutter.scrollTop = pane.textarea.scrollTop;
 }
 
 async function copyText(text, button) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.append(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-  }
+  await navigator.clipboard.writeText(text);
   const label = button.textContent;
   button.textContent = 'コピーしました';
   setTimeout(() => (button.textContent = label), 1200);
@@ -140,10 +112,7 @@ async function loadExample(file) {
 
 function save() {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ source: source.value, code: code.value, listing: listingBox.checked, auto: autoBox.checked }),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ source: source.value, code: code.value, listing: listingBox.checked }));
   } catch {}
 }
 
@@ -154,40 +123,28 @@ function restore() {
     source.value = s.source ?? '';
     code.value = s.code ?? '';
     listingBox.checked = !!s.listing;
-    autoBox.checked = !!s.auto;
     return true;
   } catch {
     return false;
   }
 }
 
-function debounce(fn, ms) {
-  let t;
-  return () => {
-    clearTimeout(t);
-    t = setTimeout(fn, ms);
-  };
-}
+const showError = (e) => showDiagnostics(panes.source, '', [], e);
 
 for (const ex of EXAMPLES) exampleSelect.add(new Option(ex.title, ex.file));
 exampleSelect.addEventListener('change', () => {
   if (!exampleSelect.value) return;
-  loadExample(exampleSelect.value).catch((e) => showDiagnostics(panes.source, '', [], e));
+  loadExample(exampleSelect.value).catch(showError);
   exampleSelect.value = '';
 });
 
-$('compile').addEventListener('click', runCompile);
-$('decompile').addEventListener('click', runDecompile);
 $('copy-source').addEventListener('click', (e) => copyText(source.value, e.currentTarget));
 $('copy-code').addEventListener('click', (e) => copyText(code.value, e.currentTarget));
 listingBox.addEventListener('change', runCompile);
-autoBox.addEventListener('change', () => {
-  save();
-  if (autoBox.checked) runCompile();
-});
 
-const autoCompile = debounce(() => autoBox.checked && runCompile(), 300);
-const debouncedSave = debounce(save, 500);
+const converters = { source: runCompile, code: runDecompile };
+// Shared timer so a pending conversion from one pane never overwrites edits in the other.
+let timer;
 
 for (const [name, pane] of Object.entries(panes)) {
   const ta = pane.textarea;
@@ -195,14 +152,11 @@ for (const [name, pane] of Object.entries(panes)) {
   ta.addEventListener('scroll', () => (gutter.scrollTop = ta.scrollTop));
   ta.addEventListener('input', () => {
     updateGutter(pane);
-    debouncedSave();
-    if (name === 'source') autoCompile();
+    clearTimeout(timer);
+    timer = setTimeout(converters[name], 300);
   });
   ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      name === 'source' ? runCompile() : runDecompile();
-    } else if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       ta.setRangeText('    ', ta.selectionStart, ta.selectionEnd, 'end');
       ta.dispatchEvent(new Event('input'));
@@ -218,5 +172,5 @@ if (restore()) {
   updateGutter(panes.source);
   updateGutter(panes.code);
 } else {
-  loadExample(EXAMPLES[0].file).catch((e) => showDiagnostics(panes.source, '', [], e));
+  loadExample(EXAMPLES[0].file).catch(showError);
 }
