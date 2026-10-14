@@ -1,0 +1,15 @@
+// ポインタ: Load Pointer [30], ポインタ書き込み, 連鎖ポインタ
+const PLAYER = 0x10A0B0C0;
+
+pointer *(u32*)PLAYER in (0x10000000, 0x40000000) {
+    *(u32*)(ptr + 0x20) = 99;            // 0012KKKK VVVVVVVV
+    if (*(f32*)(ptr + 0x24) == 0.0) {     // 0312.... 条件 (ポインタ)
+        *(f32*)(ptr + 0x24) = 100.0;
+    }
+    ptr = *(u32*)(ptr + 0x10);           // pointer-in-pointer [30] (30100000)
+    ptr += 8;                            // [31]
+    write(ptr + 0x40, "ABC");            // String Write (Pointer) [01]
+}
+
+// 1 行で書ける連鎖ポインタ: 自動で 30 / 30100000 / D0 を生成
+*(u32*)(*(u32*)(*(u32*)PLAYER + 0x10) + 0x30) = 5;

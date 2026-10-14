@@ -1,0 +1,3 @@
+#!/bin/sh
+# ./decompile codes.txt -o out.cafe
+exec node "$(dirname "$0")/bin/decafe.js" "$@"

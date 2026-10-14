@@ -1,0 +1,18 @@
+{
+  "name": "cafe-compiler",
+  "version": "0.1.0",
+  "description": "C 風の小さな言語を Wii U TCPGecko の Cafe Code に変換するコンパイラ",
+  "type": "module",
+  "bin": {
+    "compile": "bin/cafec.js",
+    "cafec": "bin/cafec.js",
+    "decompile": "bin/decafe.js"
+  },
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
