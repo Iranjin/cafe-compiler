@@ -31,6 +31,18 @@ npm test                                 # テスト
 
 `npm link` すると `compile` / `decompile` コマンドとして使えます。`-o` を省略すると標準出力に出し、入力に `-` を指定すると標準入力から読みます。
 
+### Web 版
+
+ブラウザ上で左に Cafe Script、右に Cafe Code を表示し、相互に変換できます（`index.html` と `web/`）。`src/` をそのまま ES モジュールとして読み込むので、ビルドは不要です。
+
+```sh
+python3 -m http.server 8000   # http://localhost:8000/ を開く（file:// ではモジュールを読めません）
+```
+
+- `コンパイル →` / `← 逆コンパイル`（各ペインで Ctrl+Enter）。エラーと警告は行番号付きで表示され、クリックで該当行へ移動します
+- サンプルの読み込み、コピー、ソース行コメント付き出力、自動コンパイルに対応。入力内容はブラウザに保存されます
+- `main` への push で `.github/workflows/pages.yml` が GitHub Pages にデプロイします（Settings → Pages → Source を「GitHub Actions」にしてください）
+
 エラーの例:
 
 ```
@@ -229,6 +241,7 @@ src/encoder.js      コードタイプごとのエンコーダ
 src/decompiler.js   逆コンパイラ
 src/ppc.js          PowerPC 簡易逆アセンブラ（逆コンパイル結果のコメント用）
 src/constants.js    ボタン定数
+index.html, web/    Web 版（GitHub Pages）
 examples/           サンプル（.cafe と出力 .txt）
 tests/              node:test によるテスト
 ```

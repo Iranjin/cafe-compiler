@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cafe-compiler — Cafe Script ⇄ Cafe Code</title>
+  <link rel="stylesheet" href="web/style.css">
+  <script type="module" src="web/app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>cafe-compiler</h1>
+    <p class="sub">C 風の Cafe Script と Wii U TCPGecko の Cafe Code を相互変換します</p>
+    <div class="toolbar">
+      <label>サンプル
+        <select id="example">
+          <option value="">— 選択 —</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="listing"> ソース行コメントを付ける</label>
+      <label class="check"><input type="checkbox" id="auto"> 自動コンパイル</label>
+      <a href="https://github.com/Iranjin/cafe-compiler#言語仕様" target="_blank" rel="noopener">言語仕様</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="pane" id="source-pane">
+      <div class="pane-head">
+        <h2>Cafe Script</h2>
+        <button type="button" id="copy-source">コピー</button>
+      </div>
+      <div class="editor">
+        <pre class="gutter" aria-hidden="true"></pre>
+        <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="*(u32*)0x10000000 = 1;"></textarea>
+      </div>
+      <ul class="diagnostics" id="source-diag"></ul>
+    </section>
+
+    <div class="actions">
+      <button type="button" id="compile" title="Ctrl+Enter (左ペイン)">コンパイル →</button>
+      <button type="button" id="decompile" title="Ctrl+Enter (右ペイン)">← 逆コンパイル</button>
+    </div>
+
+    <section class="pane" id="code-pane">
+      <div class="pane-head">
+        <h2>Cafe Code</h2>
+        <button type="button" id="copy-code">コピー</button>
+      </div>
+      <div class="editor">
+        <pre class="gutter" aria-hidden="true"></pre>
+        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="00020000 10000000&#10;00000001 00000000"></textarea>
+      </div>
+      <ul class="diagnostics" id="code-diag"></ul>
+    </section>
+  </main>
+
+  <footer>
+    エンコードは <a href="https://github.com/BullyWiiPlaza/tcpgecko-codetypes-documentation" target="_blank" rel="noopener">tcpgecko-codetypes-documentation</a> (TCP Gecko 2.53) 準拠。変換はすべてブラウザ内で行われます。
+  </footer>
+</body>
+</html>
